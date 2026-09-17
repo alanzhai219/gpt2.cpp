@@ -1,0 +1,149 @@
+#pragma once
+
+#include <cstddef>
+#include <stdexcept>
+#include <vector>
+#include <string>
+namespace gpt2 {
+
+struct Tensor {
+    Tensor()  = default;
+    Tensor(const std::vector<size_t>& shape, const std::vector<float>& value);
+    Tensor(const std::vector<size_t>& shape, float fill = 0.0F);
+    Tensor(const Tensor&);
+    Tensor(Tensor&&);
+    Tensor& operator=(const Tensor&);
+    Tensor& operator=(Tensor&&);
+    
+    virtual ~Tensor() = default;
+    
+    // shape: [2,3,4] => stride [12,4,1]
+    // dim:   n-1, n-2, ..., 1, 0
+    // idx of vec: 0, 1, 2, ..., n-2, n-1
+    void compute_strides() {
+        m_stride.resize(m_shape.size()); 
+        if (m_shape.empty()) return;
+        m_stride.back() = 1;
+        for (size_t idx = m_shape.size() - 1; idx > 0; --idx) {
+            m_stride[idx - 1] = m_stride[idx] * m_shape[idx];
+        }
+    }
+
+    void reshape(const std::vector<size_t>& shape) {
+        size_t count = 1;
+        for (size_t dim : shape) count *= dim;
+        if (count != m_data.size()) {
+            throw std::invalid_argument("Tensor::reshape: element count mismatch");
+        }
+        m_shape = shape;
+        compute_strides();
+    }
+
+    // access raw data
+    const std::vector<float>& data() const {
+        return m_data;
+    }
+
+    std::vector<float>& data() {
+        return m_data;
+    }
+
+    float* ptr() {
+        return m_data.data();
+    }
+
+    const float* ptr() const {
+        return m_data.data();
+    }
+
+    // access tensor data by index
+    float* ptr(size_t i, size_t j, size_t k, size_t l) {
+        const size_t offset = i * m_stride[0] + j * m_stride[1] + k * m_stride[2] + l * m_stride[3];
+        return &m_data[offset];
+    }
+
+    float* ptr(size_t i, size_t j, size_t k) {
+        const size_t offset = i * m_stride[0] + j * m_stride[1] + k * m_stride[2];
+        return &m_data[offset];
+    }
+
+    float* ptr(size_t i, size_t j) {
+        const size_t offset = i * m_stride[0] + j * m_stride[1];
+        return &m_data[offset];
+    }
+
+    // access shape
+    const std::vector<size_t>& stride() const {
+        return m_stride;
+    }
+
+    const std::vector<size_t>& shape() const {
+        return m_shape;
+    }
+
+    size_t ndims() const {
+        return m_shape.size();
+    }
+
+    size_t dim(size_t idx) const {
+        if (idx >= m_shape.size()) throw std::out_of_range("Tensor::dim");
+        return m_shape[idx];
+    }
+
+    std::string shape_str() const {
+        std::string str = "[";
+        for (size_t i = 0; i < m_shape.size(); ++i) {
+            str += std::to_string(m_shape[i]);
+            if (i != m_shape.size() - 1) {
+                str += ",";
+            }
+        }
+        str += "]";
+        return str;
+    }
+
+    size_t numel() const {
+        size_t num = 1;
+        for (auto v : m_shape) {
+            num *= v;
+        }
+        return num;
+    }
+
+    // access tensor data by index
+    float& at(size_t i, size_t j, size_t k, size_t l) {
+        const size_t offset = i * m_stride[0] + j * m_stride[1] + k * m_stride[2] + l * m_stride[3];
+        return m_data[offset];
+    }
+
+    float& at(size_t i, size_t j, size_t k) {
+        const size_t offset = i * m_stride[0] + j * m_stride[1] + k * m_stride[2];
+        return m_data[offset];
+    }
+
+    float& at(size_t i, size_t j) {
+        const size_t offset = i * m_stride[0] + j * m_stride[1];
+        return m_data[offset];
+    }
+
+    float at(size_t i, size_t j, size_t k, size_t l) const {
+        const size_t offset = i * m_stride[0] + j * m_stride[1] + k * m_stride[2] + l * m_stride[3];
+        return m_data[offset];
+    }
+
+    float at(size_t i, size_t j, size_t k) const {
+        const size_t offset = i * m_stride[0] + j * m_stride[1] + k * m_stride[2];
+        return m_data[offset];
+    }
+
+    float at(size_t i, size_t j) const {
+        const size_t offset = i * m_stride[0] + j * m_stride[1];
+        return m_data[offset];
+    }
+
+private:
+  std::vector<float>  m_data;
+  std::vector<size_t> m_shape;
+  std::vector<size_t> m_stride;
+};
+} // namespace gpt2
