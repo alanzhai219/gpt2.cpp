@@ -18,5 +18,7 @@ cd ..
 
 ## run
 ```
-./build/gpt2 generate "Hello World!" --max-tokens 50 --temp 0.8 --top-k 40 --seed 42
+# generate prompt weights_path (max-tokens temperature top-k seed)
+./build/gpt2 generate "Hello World!" 
+./build/gpt2 generate "Describe the iphone design" weights  100 0.8 40 42
 ```
