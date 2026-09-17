@@ -1,10 +1,10 @@
-#include "modeling.hpp"
-
 #include <algorithm>
 #include <cmath>
 #include <numeric>
 #include <stdexcept>
+#include <iostream>
 
+#include "modeling.hpp"
 #include "ops.hpp"
 
 namespace gpt2 {
@@ -108,12 +108,42 @@ std::string GPT2::generate(const tk::Tokenizer& tokenizer, const std::string& pr
     if (ids.empty()) ids.push_back(end_of_text);
     if (max_tokens > 0) ids.reserve(ids.size() + static_cast<size_t>(max_tokens));
 
+    if (is_profile) {
+        t.start();
+    }
     std::vector<float> logits = forward(ids, 0);
+    if (is_profile) {
+        t.stop();
+        size_t first_token_latency = t.elapsed();
+        std::cout << "[first token latency] " << first_token_latency << " ms\n";
+    }
+    size_t search_time = 0;
+    size_t next_token_time = 0;
     for (int step = 0; step < max_tokens; ++step) {
+        if (is_profile) {
+            t.start();
+        }
         const int next = temperature_search(logits, temperature, top_k);
+        if (is_profile) {
+            t.stop();
+            search_time += t.elapsed();
+        }
         ids.push_back(next);
-        if (next == end_of_text) break;
+        if (next == end_of_text) {
+            break;
+        }
+        if (is_profile) {
+            t.start();
+        }
         logits = forward({next}, m_kv_cache.get_cache_len());
+        if (is_profile) {
+            t.stop();
+            next_token_time += t.elapsed();
+        }
+    }
+    if (is_profile) {
+        std::cout << "[next token latency] " << next_token_time / max_tokens << " ms\n";
+        std::cout << "[search token latency] " << search_time / max_tokens << " ms\n";
     }
     return tokenizer.decode(ids);
 }

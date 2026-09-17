@@ -22,3 +22,7 @@ cd ..
 ./build/gpt2 generate "Hello World!" 
 ./build/gpt2 generate "Describe the iphone design" weights  100 0.8 40 42
 ```
+
+## benchmark
+
+turn on the env `export ENABLE_BENCHMARK=1`. Then the `first_token` and `next token` latency will be out.

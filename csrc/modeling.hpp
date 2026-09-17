@@ -10,6 +10,7 @@
 #include "tensor.hpp"
 #include "weights.hpp"
 #include "tokenizer.hpp"
+#include "timer.hpp"
 
 namespace gpt2 {
 
@@ -19,6 +20,7 @@ public:
         m_hidden_dim = m_w.config.n_embd / m_w.config.n_head;
         m_kv_cache = KVCACHE(m_w.config.n_layer);
         m_scale = 1.0F / std::sqrt(static_cast<float>(m_hidden_dim));
+        is_profile = std::atoi(std::getenv("ENABLE_BENCHMARK")) > 0;
     }
 
     std::vector<float> forward(const std::vector<int>& tokens, size_t n_past);
@@ -38,6 +40,8 @@ private:
     KVCACHE m_kv_cache;
     float m_scale = 0.0F;
     std::mt19937_64 m_rnd{42};
+    bool is_profile = false;
+    timer t;
 };
 
 }   // namespace gpt2
