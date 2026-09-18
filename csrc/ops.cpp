@@ -104,7 +104,6 @@ void add_(Tensor& a, const Tensor& b) {
     }
 }
 
-Tensor layer_norm(const Tensor& x, const Tensor& gamma, const Tensor& beta, float eps) {
 /*
  * x: [S, N]
  * gamma: [N]
@@ -118,6 +117,7 @@ token │ x x x x x x x │ ← 对这一行做 LayerNorm
 token │ x x x x x x x │ ← 对这一行做 LayerNorm
       └───────────────┘
 */
+Tensor layer_norm(const Tensor& x, const Tensor& gamma, const Tensor& beta, float eps) {
     const size_t n = x.dim(x.ndims() - 1);
     if (gamma.numel() != n || beta.numel() != n) {
         throw std::invalid_argument("layer_norm: parameter shape mismatch");
@@ -185,7 +185,6 @@ void split_qkv(const Tensor& qkv, Tensor& q, Tensor& k, Tensor& v) {
     }
 }
 
-Tensor split_head(const float* x, size_t seq, size_t n_head, size_t head_dim) {
 /*
  * token major => head major
  * [S, n_embd] => [n_head, S, head_dim]
@@ -210,6 +209,7 @@ Tensor split_head(const float* x, size_t seq, size_t n_head, size_t head_dim) {
  *             | token2 |
  *             | token3 |
  */
+Tensor split_head(const float* x, size_t seq, size_t n_head, size_t head_dim) {
     const size_t n = n_head * head_dim;
     Tensor out({n_head, seq, head_dim});
     for (size_t h = 0; h < n_head; ++h) {
@@ -221,8 +221,8 @@ Tensor split_head(const float* x, size_t seq, size_t n_head, size_t head_dim) {
     return out;
 }
 
-Tensor merge_head(const Tensor& x) {
 // [n_heads, S, head_dim] => [S, n_heads * head_dim] => [S, n_embd]
+Tensor merge_head(const Tensor& x) {
     if (x.ndims() != 3) {
         throw std::invalid_argument("merge_head: expected rank 3");
     }
@@ -269,12 +269,12 @@ void gelu_(Tensor& x) {
     }
 }
 
-Tensor matmul_3d(const Tensor& a, const Tensor& b) {
 /*
  * a: [head_n, S, head_dim]
  * b: [head_n, head_dim, T]
  * out: [head_n, S, T]
  */
+Tensor matmul_3d(const Tensor& a, const Tensor& b) {
     if (a.ndims() != 3 || b.ndims() != 3 || a.dim(0) != b.dim(0) || a.dim(2) != b.dim(1)) {
         throw std::invalid_argument("matmul_3d: incompatible shapes");
     }
@@ -293,8 +293,8 @@ Tensor matmul_3d(const Tensor& a, const Tensor& b) {
     return out;
 }
 
-Tensor causal_mask(const Tensor& a, size_t n_past) {
 // [n_heads, S, T]
+Tensor causal_mask(const Tensor& a, size_t n_past) {
     if (a.ndims() != 3) {
         throw std::invalid_argument("causal_mask: expected rank 3");
     }
@@ -318,10 +318,10 @@ Tensor scale(const Tensor& x, float s) {
     return out;
 }
 
-Tensor transpose_2d(const Tensor& x) {
 /*
  * [..., Y, Z] => [..., Z, Y]
  */
+Tensor transpose_2d(const Tensor& x) {
     if (x.ndims() != 2) {
         throw std::invalid_argument("transpose_2d: expected rank 2");
     }
@@ -334,10 +334,10 @@ Tensor transpose_2d(const Tensor& x) {
     return out;
 }
 
-Tensor transpose_3d(const Tensor& x) {
 /*
  * [D0, D1, D2] => [D0, D2, D1]
  */
+Tensor transpose_3d(const Tensor& x) {
     if (x.ndims() != 3) {
         throw std::invalid_argument("transpose_3d: expected rank 3");
     }
@@ -352,8 +352,8 @@ Tensor transpose_3d(const Tensor& x) {
     return out;
 }
 
-Tensor gemv(const Tensor& x, const float* v) {
 // [n_vocab, n_embd] * [n_embd]
+Tensor gemv(const Tensor& x, const float* v) {
     if (x.ndims() != 2) {
         throw std::invalid_argument("gemv: expected rank 2");
     }

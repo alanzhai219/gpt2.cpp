@@ -16,15 +16,25 @@ std::vector<float> GPT2::forward(const std::vector<int>& tokens, size_t n_past) 
     }
     const size_t seq = tokens.size();
     const size_t n_embd = m_w.config.n_embd;
-    Tensor x = ops::add(ops::token_embed(m_w.wte, tokens),
-                        ops::position_embed(m_w.wpe, n_past, seq));
+
+    // [S, n_embd]
+    Tensor tok_emb = ops::token_embed(m_w.wte, tokens);
+    // [S, n_embd]
+    Tensor pos_emb = ops::position_embed(m_w.wpe, n_past, seq); 
+
+    // [S, n_embd]
+    Tensor x = ops::add(tok_emb, pos_emb);
+
     for (size_t layer = 0; layer < m_w.config.n_layer; ++layer) {
         transfomer_layer(layer, x, n_past);
     }
     m_kv_cache.set_cache_len(n_past + seq);
 
+    // [S, n_embd]
     Tensor normalized = ops::layer_norm(x, m_w.ln_f_w, m_w.ln_f_b);
+    // select the last row of [S, n_embd] => [n_embd]
     const float* last = normalized.ptr() + (seq - 1) * n_embd;
+    // [n_vocab] = [n_vocab, n_emdb] @ [n_embd]
     Tensor logits = ops::gemv(m_w.wte, last);
     return logits.data();
 }
@@ -40,28 +50,41 @@ void GPT2::attn(size_t layer_id, Tensor& x, size_t n_past) {
     const size_t n_embd = m_w.config.n_embd;
     const size_t total = n_past + seq;
 
+    // [S, n_embd]
     Tensor normalized = ops::layer_norm(x, layer.ln_1_w, layer.ln_1_b);
+    // [S, 3xn_embd] = [S, n_embd] @ [n_embd, 3xn_embd]
     Tensor qkv = ops::matmul_2d(normalized, layer.attn_c_attn_w);
     ops::add_(qkv, layer.attn_c_attn_b);
 
     Tensor q, k, v;
+    // q,k,v: [S, n_embd]
     ops::split_qkv(qkv, q, k, v);
-    std::vector<float>& k_cache = m_kv_cache.k(layer_id);
-    std::vector<float>& v_cache = m_kv_cache.v(layer_id);
+    std::vector<float>& k_cache = m_kv_cache.k_get_layer(layer_id);
+    std::vector<float>& v_cache = m_kv_cache.v_get_layer(layer_id);
+    // 1st: store [S, n_embd] : total = S 
+    // 2nd: push  [1, n_embd] : total += 1
     k_cache.reserve(total * n_embd);
     v_cache.reserve(total * n_embd);
     k_cache.insert(k_cache.end(), k.ptr(), k.ptr() + k.numel());
     v_cache.insert(v_cache.end(), v.ptr(), v.ptr() + v.numel());
 
+    // [n_head, S, head_dim]
     Tensor query = ops::split_head(q.ptr(), seq, m_w.config.n_head, m_hidden_dim);
     Tensor key = ops::split_head(k_cache.data(), total, m_w.config.n_head, m_hidden_dim);
     Tensor value = ops::split_head(v_cache.data(), total, m_w.config.n_head, m_hidden_dim);
+
+    // [n_head, S, S] = [n_head, S, head_dim] @ [n_head, head_dim, S]
     Tensor scores = ops::matmul_3d(query, ops::transpose_3d(key));
     scores = ops::scale(scores, m_scale);
+    // [n_head, S, S]
     scores = ops::causal_mask(scores, n_past);
     scores = ops::softmax(scores);
+    // [n_head, S, head_dim] = [n_head, S, S] @ [n_head, S, head_dim]
     Tensor attended = ops::matmul_3d(scores, value);
-    Tensor projection = ops::matmul_2d(ops::merge_head(attended), layer.attn_c_proj_w);
+    // [S, n_embd]
+    Tensor attended_merge = ops::merge_head(attended);
+    // [S, n_embd] = [S, n_embd] @ [n_embd, n_embd]
+    Tensor projection = ops::matmul_2d(attended_merge, layer.attn_c_proj_w);
     ops::add_(projection, layer.attn_c_proj_b);
     ops::add_(x, projection);
 }
@@ -69,10 +92,12 @@ void GPT2::attn(size_t layer_id, Tensor& x, size_t n_past) {
 void GPT2::mlp(size_t layer_id, Tensor& x, size_t n_past) {
     (void)n_past;
     const LayerWeights& layer = m_w.layers.at(layer_id);
-    Tensor hidden = ops::matmul_2d(
-        ops::layer_norm(x, layer.ln_2_w, layer.ln_2_b), layer.mlp_c_fc_w);
+    Tensor ln2 = ops::layer_norm(x, layer.ln_2_w, layer.ln_2_b);
+    // [S, 4xn_embd] = [S, n_embd] @ [n_embd, 4xn_embd]
+    Tensor hidden = ops::matmul_2d(ln2, layer.mlp_c_fc_w);
     ops::add_(hidden, layer.mlp_c_fc_b);
     ops::gelu_(hidden);
+    // [S, n_embd] = [S, 4xn_embd] @ [4xn_embd, n_embd]
     Tensor output = ops::matmul_2d(hidden, layer.mlp_c_proj_w);
     ops::add_(output, layer.mlp_c_proj_b);
     ops::add_(x, output);

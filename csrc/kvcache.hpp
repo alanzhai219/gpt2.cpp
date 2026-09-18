@@ -17,11 +17,11 @@ struct KVCACHE {
         m_cache_len = 0;
     }
 
-    std::vector<float>& k(size_t layer_id) {
+    std::vector<float>& k_get_layer(size_t layer_id) {
         return m_kcache[layer_id];
     }
 
-    std::vector<float>& v(size_t layer_id) {
+    std::vector<float>& v_get_layer(size_t layer_id) {
         return m_vcache[layer_id];
     }
 
