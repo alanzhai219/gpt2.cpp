@@ -29,6 +29,8 @@ turn on the env `export ENABLE_BENCHMARK=1`. Then the `first_token` and `next to
 
 ## performance
 
+| Intel(R) Core(TM) Ultra 7 155H
+
 | version | first token(ms) | next token(ms) | first token speed up | next token speed up | comments |
 | -- | -- | -- | -- | -- | -- |
 | v0.0.1 | 1023 | 509 | x1 | x1 | na |
