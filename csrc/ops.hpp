@@ -36,6 +36,24 @@ void gelu_(Tensor& x);
 
 Tensor matmul_3d(const Tensor& a, const Tensor& b);
 
+// Q [H, S, D] x K_cache^T [H, D, T] -> [H, S, T].
+// K cache storage is head-major [H, Tmax, D], with valid length T.
+Tensor matmul_qk_cache(const Tensor& query,
+					   const std::vector<float>& key_cache,
+					   size_t num_heads,
+					   size_t max_cache_len,
+					   size_t head_dim,
+					   size_t cache_len);
+
+// Scores [H, S, T] x V_cache [H, T, D] -> [H, S, D].
+// V cache storage is head-major [H, Tmax, D], with valid length T.
+Tensor matmul_av_cache(const Tensor& scores,
+					   const std::vector<float>& value_cache,
+					   size_t num_heads,
+					   size_t max_cache_len,
+					   size_t head_dim,
+					   size_t cache_len);
+
 Tensor causal_mask(const Tensor& a, size_t n_past);
 
 Tensor scale(const Tensor& x, const float s);

@@ -11,7 +11,7 @@ namespace gpt2 {
 
 std::vector<float> GPT2::forward(const std::vector<int>& tokens, size_t n_past) {
     if (tokens.empty()) throw std::invalid_argument("forward: tokens must not be empty");
-    if (n_past != m_kv_cache.get_cache_len()) {
+    if (n_past != m_kv_cache.get_current_cache_len()) {
         throw std::runtime_error("forward: n_past does not match KV cache length");
     }
     const size_t seq = tokens.size();
@@ -28,8 +28,6 @@ std::vector<float> GPT2::forward(const std::vector<int>& tokens, size_t n_past) 
     for (size_t layer = 0; layer < m_w.config.n_layer; ++layer) {
         transfomer_layer(layer, x, n_past);
     }
-    m_kv_cache.set_cache_len(n_past + seq);
-
     // [S, n_embd]
     Tensor normalized = ops::layer_norm(x, m_w.ln_f_w, m_w.ln_f_b);
     // select the last row of [S, n_embd] => [n_embd]
@@ -47,8 +45,6 @@ void GPT2::transfomer_layer(size_t layer_id, Tensor& x, size_t n_past) {
 void GPT2::attn(size_t layer_id, Tensor& x, size_t n_past) {
     const LayerWeights& layer = m_w.layers.at(layer_id);
     const size_t seq = x.dim(0);
-    const size_t n_embd = m_w.config.n_embd;
-    const size_t total = n_past + seq;
 
     // [S, n_embd]
     Tensor normalized = ops::layer_norm(x, layer.ln_1_w, layer.ln_1_b);
@@ -59,28 +55,29 @@ void GPT2::attn(size_t layer_id, Tensor& x, size_t n_past) {
     Tensor q, k, v;
     // q,k,v: [S, n_embd]
     ops::split_qkv(qkv, q, k, v);
-    std::vector<float>& k_cache = m_kv_cache.k_get_layer(layer_id);
-    std::vector<float>& v_cache = m_kv_cache.v_get_layer(layer_id);
-    // 1st: store [S, n_embd] : total = S 
-    // 2nd: push  [1, n_embd] : total += 1
-    k_cache.reserve(total * n_embd);
-    v_cache.reserve(total * n_embd);
-    k_cache.insert(k_cache.end(), k.ptr(), k.ptr() + k.numel());
-    v_cache.insert(v_cache.end(), v.ptr(), v.ptr() + v.numel());
+    auto& kv_cache = m_kv_cache.get_layer_cache(layer_id);
+    // Store only the new token block once: [S, C] -> cache [H, Tmax, D].
+    kv_cache.append(k.ptr(), v.ptr(), seq);
 
-    // [n_head, S, head_dim]
+    // Q: [H, S, D]. K/V stay in cache as [H, Tmax, D] and are read by the MatMul operators.
     Tensor query = ops::split_head(q.ptr(), seq, m_w.config.n_head, m_hidden_dim);
-    Tensor key = ops::split_head(k_cache.data(), total, m_w.config.n_head, m_hidden_dim);
-    Tensor value = ops::split_head(v_cache.data(), total, m_w.config.n_head, m_hidden_dim);
-
-    // [n_head, S, S] = [n_head, S, head_dim] @ [n_head, head_dim, S]
-    Tensor scores = ops::matmul_3d(query, ops::transpose_3d(key));
+    // [H, S, T] = [H, S, D] @ K_cache^T[H, D, T]
+    Tensor scores = ops::matmul_qk_cache(query,
+                                          kv_cache.get_kcache(),
+                                          kv_cache.num_heads(),
+                                          kv_cache.max_cache_len(),
+                                          kv_cache.head_size(),
+                                          kv_cache.get_cache_len());
     scores = ops::scale(scores, m_scale);
-    // [n_head, S, S]
     scores = ops::causal_mask(scores, n_past);
     scores = ops::softmax(scores);
-    // [n_head, S, head_dim] = [n_head, S, S] @ [n_head, S, head_dim]
-    Tensor attended = ops::matmul_3d(scores, value);
+    // [H, S, D] = [H, S, T] @ V_cache[H, T, D]
+    Tensor attended = ops::matmul_av_cache(scores,
+                                            kv_cache.get_vcache(),
+                                            kv_cache.num_heads(),
+                                            kv_cache.max_cache_len(),
+                                            kv_cache.head_size(),
+                                            kv_cache.get_cache_len());
     // [S, n_embd]
     Tensor attended_merge = ops::merge_head(attended);
     // [S, n_embd] = [S, n_embd] @ [n_embd, n_embd]
@@ -160,7 +157,7 @@ std::string GPT2::generate(const tk::Tokenizer& tokenizer, const std::string& pr
         if (is_profile) {
             t.start();
         }
-        logits = forward({next}, m_kv_cache.get_cache_len());
+        logits = forward({next}, m_kv_cache.get_current_cache_len());
         if (is_profile) {
             t.stop();
             next_token_time += t.elapsed();

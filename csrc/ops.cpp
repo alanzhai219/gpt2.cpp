@@ -8,6 +8,31 @@
 
 namespace gpt2::ops {
 
+namespace {
+
+const float* cache_head_ptr(const std::vector<float>& cache,
+                            size_t head,
+                            size_t max_cache_len,
+                            size_t head_dim) {
+    return cache.data() + head * max_cache_len * head_dim;
+}
+
+float dot_product(const float* lhs, const float* rhs, size_t size) {
+    float result = 0.0F;
+    for (size_t i = 0; i < size; ++i) {
+        result += lhs[i] * rhs[i];
+    }
+    return result;
+}
+
+void scaled_accumulate(float* output, const float* input, float scale, size_t size) {
+    for (size_t i = 0; i < size; ++i) {
+        output[i] += scale * input[i];
+    }
+}
+
+}  // namespace
+
 /*
 wte:
 
@@ -287,6 +312,64 @@ Tensor matmul_3d(const Tensor& a, const Tensor& b) {
                 for (size_t j = 0; j < n; ++j) {
                     out.ptr()[(h * m + i) * n + j] += av * b.ptr()[(h * k + p) * n + j];
                 }
+            }
+        }
+    }
+    return out;
+}
+
+Tensor matmul_qk_cache(const Tensor& query,
+                       const std::vector<float>& key_cache,
+                       size_t num_heads,
+                       size_t max_cache_len,
+                       size_t head_dim,
+                       size_t cache_len) {
+    if (query.ndims() != 3 || query.dim(0) != num_heads || query.dim(2) != head_dim ||
+        cache_len > max_cache_len || key_cache.size() != num_heads * max_cache_len * head_dim) {
+        throw std::invalid_argument("matmul_qk_cache: incompatible query and cache shapes");
+    }
+
+    const size_t heads = num_heads;
+    const size_t seq = query.dim(1);
+    Tensor out({heads, seq, cache_len});
+
+    for (size_t h = 0; h < heads; ++h) {
+        const float* key_head = cache_head_ptr(key_cache, h, max_cache_len, head_dim);
+        for (size_t s = 0; s < seq; ++s) {
+            const float* query_head = query.ptr() + (h * seq + s) * head_dim;
+            float* out_row = out.ptr() + (h * seq + s) * cache_len;
+            for (size_t t = 0; t < cache_len; ++t) {
+                const float* key_token = key_head + t * head_dim;
+                out_row[t] = dot_product(query_head, key_token, head_dim);
+            }
+        }
+    }
+    return out;
+}
+
+Tensor matmul_av_cache(const Tensor& scores,
+                       const std::vector<float>& value_cache,
+                       size_t num_heads,
+                       size_t max_cache_len,
+                       size_t head_dim,
+                       size_t cache_len) {
+    if (scores.ndims() != 3 || scores.dim(0) != num_heads || scores.dim(2) != cache_len ||
+        cache_len > max_cache_len || value_cache.size() != num_heads * max_cache_len * head_dim) {
+        throw std::invalid_argument("matmul_av_cache: incompatible scores and cache shapes");
+    }
+
+    const size_t heads = num_heads;
+    const size_t seq = scores.dim(1);
+    Tensor out({heads, seq, head_dim});
+
+    for (size_t h = 0; h < heads; ++h) {
+        const float* value_head = cache_head_ptr(value_cache, h, max_cache_len, head_dim);
+        for (size_t s = 0; s < seq; ++s) {
+            const float* score_row = scores.ptr() + (h * seq + s) * cache_len;
+            float* out_head = out.ptr() + (h * seq + s) * head_dim;
+            for (size_t t = 0; t < cache_len; ++t) {
+                const float* value_token = value_head + t * head_dim;
+                scaled_accumulate(out_head, value_token, score_row[t], head_dim);
             }
         }
     }

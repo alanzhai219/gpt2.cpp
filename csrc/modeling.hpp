@@ -16,11 +16,19 @@ namespace gpt2 {
 
 class GPT2 {
 public:
-    explicit GPT2(GPT2Weights m) : m_w(std::move(m)) {
+    explicit GPT2(GPT2Weights m)
+        : m_w(std::move(m)),
+          m_kv_cache(m_w.config.n_layer,
+                     m_w.config.n_embd / m_w.config.n_head,
+                     m_w.config.n_head,
+                     m_w.config.n_positions) {
+        if (m_w.config.n_embd % m_w.config.n_head != 0) {
+            throw std::invalid_argument("n_embd must be divisible by n_head");
+        }
         m_hidden_dim = m_w.config.n_embd / m_w.config.n_head;
-        m_kv_cache = KVCACHE(m_w.config.n_layer);
         m_scale = 1.0F / std::sqrt(static_cast<float>(m_hidden_dim));
-        is_profile = std::atoi(std::getenv("ENABLE_BENCHMARK")) > 0;
+        const char* benchmark = std::getenv("ENABLE_BENCHMARK");
+        is_profile = benchmark != nullptr && std::atoi(benchmark) > 0;
     }
 
     std::vector<float> forward(const std::vector<int>& tokens, size_t n_past);
@@ -37,7 +45,7 @@ public:
 private:
     GPT2Weights m_w;
     size_t m_hidden_dim;
-    KVCACHE m_kv_cache;
+    KVCache m_kv_cache;
     float m_scale = 0.0F;
     std::mt19937_64 m_rnd{42};
     bool is_profile = false;
