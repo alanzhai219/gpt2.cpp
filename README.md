@@ -26,3 +26,10 @@ cd ..
 ## benchmark
 
 turn on the env `export ENABLE_BENCHMARK=1`. Then the `first_token` and `next token` latency will be out.
+
+## performance
+
+| version | first token(ms) | next token(ms) | first token speed up | next token speed up | comments |
+| -- | -- | -- | -- | -- | -- |
+| v0.0.1 | 1023 | 509 | x1 | x1 | na |
+
