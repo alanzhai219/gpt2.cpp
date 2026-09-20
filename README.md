@@ -34,4 +34,5 @@ turn on the env `export ENABLE_BENCHMARK=1`. Then the `first_token` and `next to
 | version | first token(ms) | next token(ms) | first token speed up | next token speed up | comments |
 | -- | -- | -- | -- | -- | -- |
 | v0.0.1 | 1023 | 509 | x1 | x1 | na |
+| v0.0.2 | 259 | 94 | x3.95 | x5.41 | update: kvcache [H,S,D] |
 
