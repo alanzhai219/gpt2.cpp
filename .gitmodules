@@ -1,0 +1,3 @@
+[submodule "thirdparty/llm-bricks"]
+	path = thirdparty/llm-bricks
+	url = https://github.com/alanzhai219/llm-bricks.git
