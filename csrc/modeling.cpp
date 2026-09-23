@@ -12,7 +12,7 @@ namespace gpt2 {
 
 void GPT2::init_op() {
     m_llm_context.device = llm_bricks::DeviceType::cpu;
-    m_llm_context.backend = llm_bricks::Backend::reference;
+    m_llm_context.backend = llm_bricks::Backend::avx2;
     m_llm_add = std::make_unique<llm_bricks::Add>(m_llm_context);
     m_llm_layer_norm = std::make_unique<llm_bricks::LayerNorm>(m_llm_context);
     m_llm_scale = std::make_unique<llm_bricks::Scale>(m_llm_context);
