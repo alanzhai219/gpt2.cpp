@@ -3,8 +3,11 @@
 #include <vector>
 #include <string>
 #include <random>
+#include <memory>
 #include <cstdint>
 #include <cmath>
+
+#include <llm-bricks.hpp>
 
 #include "kvcache.hpp"
 #include "tensor.hpp"
@@ -21,7 +24,7 @@ public:
           m_kv_cache(m_w.config.n_layer,
                      m_w.config.n_embd / m_w.config.n_head,
                      m_w.config.n_head,
-                     m_w.config.n_positions) {
+                                         m_w.config.n_positions) {
         if (m_w.config.n_embd % m_w.config.n_head != 0) {
             throw std::invalid_argument("n_embd must be divisible by n_head");
         }
@@ -29,12 +32,14 @@ public:
         m_scale = 1.0F / std::sqrt(static_cast<float>(m_hidden_dim));
         const char* benchmark = std::getenv("ENABLE_BENCHMARK");
         is_profile = benchmark != nullptr && std::atoi(benchmark) > 0;
+        init_op();
     }
 
     std::vector<float> forward(const std::vector<int>& tokens, size_t n_past);
     void transfomer_layer(size_t layer_id, Tensor& x, size_t n_past);
     void attn(size_t layer_id, Tensor& x, size_t n_past);
     void mlp(size_t layer_id, Tensor& x, size_t n_past);
+    void init_op();
 
     void reset_cache() { m_kv_cache.reset(); }
 
@@ -46,6 +51,12 @@ private:
     GPT2Weights m_w;
     size_t m_hidden_dim;
     KVCache m_kv_cache;
+    llm_bricks::Context m_llm_context;
+    std::unique_ptr<llm_bricks::Add> m_llm_add;
+    std::unique_ptr<llm_bricks::LayerNorm> m_llm_layer_norm;
+    std::unique_ptr<llm_bricks::Scale> m_llm_scale;
+    std::unique_ptr<llm_bricks::Softmax> m_llm_softmax;
+    std::unique_ptr<llm_bricks::Gelu> m_llm_gelu;
     float m_scale = 0.0F;
     std::mt19937_64 m_rnd{42};
     bool is_profile = false;

@@ -288,7 +288,9 @@ Tensor softmax(const Tensor& x) {
 void gelu_(Tensor& x) {
     constexpr float sqrt_2_over_pi = 0.7978845608028654F;
     constexpr float coeff = 0.044715F;
-    for (float& value : x.data()) {
+    float* values = x.ptr();
+    for (size_t i = 0; i < x.numel(); ++i) {
+        float& value = values[i];
         const float inner = sqrt_2_over_pi * (value + coeff * value * value * value);
         value = 0.5F * value * (1.0F + std::tanh(inner));
     }
@@ -395,8 +397,9 @@ Tensor causal_mask(const Tensor& a, size_t n_past) {
 
 Tensor scale(const Tensor& x, float s) {
     Tensor out(x);
-    for (float& value : out.data()) {
-        value *= s;
+    float* values = out.ptr();
+    for (size_t i = 0; i < out.numel(); ++i) {
+        values[i] *= s;
     }
     return out;
 }
