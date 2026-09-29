@@ -24,7 +24,7 @@ public:
           m_kv_cache(m_w.config.n_layer,
                      m_w.config.n_embd / m_w.config.n_head,
                      m_w.config.n_head,
-                                         m_w.config.n_positions) {
+                     m_w.config.n_positions) {
         if (m_w.config.n_embd % m_w.config.n_head != 0) {
             throw std::invalid_argument("n_embd must be divisible by n_head");
         }
@@ -57,6 +57,7 @@ private:
     std::unique_ptr<llm_bricks::Scale> m_llm_scale;
     std::unique_ptr<llm_bricks::Softmax> m_llm_softmax;
     std::unique_ptr<llm_bricks::Gelu> m_llm_gelu;
+    std::unique_ptr<llm_bricks::MatMul> m_llm_matmul;
     float m_scale = 0.0F;
     std::mt19937_64 m_rnd{42};
     bool is_profile = false;

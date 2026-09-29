@@ -18,6 +18,7 @@ void GPT2::init_op() {
     m_llm_scale = std::make_unique<llm_bricks::Scale>(m_llm_context);
     m_llm_softmax = std::make_unique<llm_bricks::Softmax>(m_llm_context);
     m_llm_gelu = std::make_unique<llm_bricks::Gelu>(m_llm_context);
+    m_llm_matmul = std::make_unique<llm_bricks::MatMul>(m_llm_context);
 }
 
 std::vector<float> GPT2::forward(const std::vector<int>& tokens, size_t n_past) {
@@ -69,7 +70,12 @@ void GPT2::attn(size_t layer_id, Tensor& x, size_t n_past) {
     m_llm_layer_norm->set_input(attn_layer_norm_params);
     (void)m_llm_layer_norm->infer();
     // [S, 3xn_embd] = [S, n_embd] @ [n_embd, 3xn_embd]
-    Tensor qkv = ops::matmul_2d(normalized, layer.attn_c_attn_w);
+    // Tensor qkv = ops::matmul_2d(normalized, layer.attn_c_attn_w);
+    Tensor qkv({normalized.dim(0), layer.attn_c_attn_w.dim(1)});
+    llm_bricks::MatMulParams matmul_attn_params_0(normalized, layer.attn_c_attn_w, qkv);
+    m_llm_matmul->set_input(matmul_attn_params_0);
+    m_llm_matmul->infer();
+
     ops::add_(qkv, layer.attn_c_attn_b);
 
     Tensor q, k, v;
@@ -109,7 +115,12 @@ void GPT2::attn(size_t layer_id, Tensor& x, size_t n_past) {
     // [S, n_embd]
     Tensor attended_merge = ops::merge_head(attended);
     // [S, n_embd] = [S, n_embd] @ [n_embd, n_embd]
-    Tensor projection = ops::matmul_2d(attended_merge, layer.attn_c_proj_w);
+    // Tensor projection = ops::matmul_2d(attended_merge, layer.attn_c_proj_w);
+    Tensor projection({attended_merge.dim(0), layer.attn_c_proj_w.dim(1)});
+    llm_bricks::MatMulParams matmul_attn_params_1(attended_merge, layer.attn_c_proj_w, projection);
+    m_llm_matmul->set_input(matmul_attn_params_1);
+    m_llm_matmul->infer();
+
     ops::add_(projection, layer.attn_c_proj_b);
     ops::add_(x, projection);
 }
@@ -122,13 +133,24 @@ void GPT2::mlp(size_t layer_id, Tensor& x, size_t n_past) {
     m_llm_layer_norm->set_input(mlp_layer_norm_params);
     (void)m_llm_layer_norm->infer();
     // [S, 4xn_embd] = [S, n_embd] @ [n_embd, 4xn_embd]
-    Tensor hidden = ops::matmul_2d(ln2, layer.mlp_c_fc_w);
+    // Tensor hidden = ops::matmul_2d(ln2, layer.mlp_c_fc_w);
+
+    Tensor hidden({ln2.dim(0), layer.mlp_c_fc_w.dim(1)});
+    llm_bricks::MatMulParams matmul_mlp_params_0(ln2, layer.mlp_c_fc_w, hidden);
+    m_llm_matmul->set_input(matmul_mlp_params_0);
+    m_llm_matmul->infer();
+
     ops::add_(hidden, layer.mlp_c_fc_b);
     llm_bricks::GeluParams gelu_params(hidden);
     m_llm_gelu->set_input(gelu_params);
     (void)m_llm_gelu->infer();
     // [S, n_embd] = [S, 4xn_embd] @ [4xn_embd, n_embd]
-    Tensor output = ops::matmul_2d(hidden, layer.mlp_c_proj_w);
+    // Tensor output = ops::matmul_2d(hidden, layer.mlp_c_proj_w);
+    Tensor output({hidden.dim(0), layer.mlp_c_proj_w.dim(1)});
+    llm_bricks::MatMulParams matmul_mlp_params_1(hidden, layer.mlp_c_proj_w, output);
+    m_llm_matmul->set_input(matmul_mlp_params_1);
+    m_llm_matmul->infer();
+
     ops::add_(output, layer.mlp_c_proj_b);
     ops::add_(x, output);
 }
