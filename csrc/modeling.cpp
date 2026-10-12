@@ -18,7 +18,7 @@ void GPT2::init_op() {
     m_llm_scale = std::make_unique<llm_bricks::Scale>(m_llm_context);
     m_llm_softmax = std::make_unique<llm_bricks::Softmax>(m_llm_context);
     m_llm_gelu = std::make_unique<llm_bricks::Gelu>(m_llm_context);
-    m_llm_matmul = std::make_unique<llm_bricks::MatMul>(m_llm_context);
+    m_llm_matmul = std::make_unique<llm_bricks::MatMul>(m_llm_matmul_context);
 }
 
 std::vector<float> GPT2::forward(const std::vector<int>& tokens, size_t n_past) {

@@ -52,6 +52,7 @@ private:
     size_t m_hidden_dim;
     KVCache m_kv_cache;
     llm_bricks::Context m_llm_context;
+    llm_bricks::Context m_llm_matmul_context{llm_bricks::DeviceType::cpu, llm_bricks::Backend::reference};
     std::unique_ptr<llm_bricks::Add> m_llm_add;
     std::unique_ptr<llm_bricks::LayerNorm> m_llm_layer_norm;
     std::unique_ptr<llm_bricks::Scale> m_llm_scale;
