@@ -8,7 +8,13 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-add_compile_options(-O2 -Wall -Wextra)
+add_compile_options(-Wall -Wextra)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-g -O0)
+else()
+    add_compile_options(-O2)
+endif()
 
 set(LLMBRICKS_BUILD_TESTS OFF CACHE BOOL "Build llm-bricks tests" FORCE)
 set(LLMBRICKS_INSTALL OFF CACHE BOOL "Install llm-bricks" FORCE)
