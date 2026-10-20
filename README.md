@@ -16,6 +16,12 @@ cd ..
 ```
 > If failed to download the model files, you can access the above urls and download them manually. Then copy them to `weights` directory.
 
+## prepare
+```bash
+# turn on PMU for profiling
+echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
+```
+
 ## run
 ```
 # generate prompt weights_path (max-tokens temperature top-k seed)
@@ -41,7 +47,7 @@ turn on the env `export ENABLE_BENCHMARK=1`. Then the `first_token` and `next to
 ## profile
 
 ```bash
-export LINUX_PERF=DUMP
+export LINUX_PERF=dump
 ```
 
 then, profiled file will be dumpled in the current folder, named `perf_dump.json`. It can be read in `edge` or `chrome` browser.
