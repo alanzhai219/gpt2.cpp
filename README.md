@@ -38,3 +38,12 @@ turn on the env `export ENABLE_BENCHMARK=1`. Then the `first_token` and `next to
 | v0.0.3 | 223 | 63 | x4.59 | x8.08 | update: element-wise avx2 |
 | v0.0.4 | 115 | 43 | x8.9 | x11.84 | update: matmul avx2 |
 
+## profile
+
+```bash
+export LINUX_PERF=DUMP
+```
+
+then, profiled file will be dumpled in the current folder, named `perf_dump.json`. It can be read in `edge` or `chrome` browser.
+
+![Profiling result](doc/profiling_result.png)

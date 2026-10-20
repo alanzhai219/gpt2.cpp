@@ -23,6 +23,7 @@ void GPT2::init_op() {
 }
 
 std::vector<float> GPT2::forward(const std::vector<int>& tokens, size_t n_past) {
+    const auto prof = llm_bricks::LinuxPerf::Profile("GPT2", "forward", n_past);
     if (tokens.empty()) throw std::invalid_argument("forward: tokens must not be empty");
     if (n_past != m_kv_cache.get_current_cache_len()) {
         throw std::runtime_error("forward: n_past does not match KV cache length");
@@ -42,16 +43,21 @@ std::vector<float> GPT2::forward(const std::vector<int>& tokens, size_t n_past) 
     (void)m_llm_add->infer();
 
     for (size_t layer = 0; layer < m_w.config.n_layer; ++layer) {
+        auto p = llm_bricks::LinuxPerf::Profile("GPT2_transformer", "transformer", layer);
         transfomer_layer(layer, x, n_past);
     }
     // [S, n_embd]
     Tensor normalized(x.shape());
     llm_bricks::LayerNormParams final_layer_norm_params(x, m_w.ln_f_w, m_w.ln_f_b, 1.0e-5F, normalized);
     m_llm_layer_norm->set_input(final_layer_norm_params);
-    (void)m_llm_layer_norm->infer();
+    {
+        auto p_ln = llm_bricks::LinuxPerf::Profile("GPT2_final_layer_norm", "layer_norm", 0);
+        (void)m_llm_layer_norm->infer();
+    }
     // select the last row of [S, n_embd] => [n_embd]
     const float* last = normalized.ptr() + (seq - 1) * n_embd;
     // [n_vocab] = [n_vocab, n_emdb] @ [n_embd]
+    auto p_gemv = llm_bricks::LinuxPerf::Profile("GPT2_final_gemv", "gemv", 0);
     Tensor logits = ops::gemv(m_w.wte, last);
     return std::vector<float>(logits.ptr(), logits.ptr() + logits.numel());
 }
@@ -62,6 +68,7 @@ void GPT2::transfomer_layer(size_t layer_id, Tensor& x, size_t n_past) {
 }
 
 void GPT2::attn(size_t layer_id, Tensor& x, size_t n_past) {
+    auto p_attn = llm_bricks::LinuxPerf::Profile("GPT2_attn", "attn", layer_id);
     const LayerWeights& layer = m_w.layers.at(layer_id);
     const size_t seq = x.dim(0);
 
@@ -127,6 +134,7 @@ void GPT2::attn(size_t layer_id, Tensor& x, size_t n_past) {
 }
 
 void GPT2::mlp(size_t layer_id, Tensor& x, size_t n_past) {
+    auto p_mlp = llm_bricks::LinuxPerf::Profile("GPT2_mlp", "mlp", layer_id);
     (void)n_past;
     const LayerWeights& layer = m_w.layers.at(layer_id);
     Tensor ln2(x.shape());
