@@ -27,6 +27,13 @@ echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
 # generate prompt weights_path (max-tokens temperature top-k seed)
 ./build/gpt2 generate "Hello World!" 
 ./build/gpt2 generate "Describe the iphone design" weights  100 0.8 40 42
+
+# reference output:
+Describe the iphone design from the previous page to the following page:
+
+This design was commissioned to make the iPhone 5 as a personal device. It is not available for sale in any store. In addition, the iPhone 5 is not available for sale in any retail store.
+
+I've always bought a phone that doesn't feature a screen, and it's very easy to use and simple to assemble. It takes about 5 minutes to assemble, and you can also use a pen or a flatbed to do the
 ```
 
 ## benchmark
