@@ -13,6 +13,8 @@ namespace gpt2 {
 void GPT2::init_op() {
     m_llm_context.device = llm_bricks::DeviceType::cpu;
     m_llm_context.backend = llm_bricks::Backend::avx2;
+    m_llm_context_ref.device = llm_bricks::DeviceType::cpu;
+    m_llm_context_ref.backend = llm_bricks::Backend::reference;
     m_llm_add = std::make_unique<llm_bricks::Add>(m_llm_context);
     m_llm_layer_norm = std::make_unique<llm_bricks::LayerNorm>(m_llm_context);
     m_llm_scale = std::make_unique<llm_bricks::Scale>(m_llm_context);
@@ -20,6 +22,7 @@ void GPT2::init_op() {
     m_llm_gelu = std::make_unique<llm_bricks::Gelu>(m_llm_context);
     // m_llm_matmul = std::make_unique<llm_bricks::MatMul>(m_llm_matmul_context);
     m_llm_matmul = std::make_unique<llm_bricks::MatMul>(m_llm_context);
+    m_llm_gemv = std::make_unique<llm_bricks::Gemv>(m_llm_context_ref);
 }
 
 std::vector<float> GPT2::forward(const std::vector<int>& tokens, size_t n_past) {
@@ -57,8 +60,14 @@ std::vector<float> GPT2::forward(const std::vector<int>& tokens, size_t n_past) 
     // select the last row of [S, n_embd] => [n_embd]
     const float* last = normalized.ptr() + (seq - 1) * n_embd;
     // [n_vocab] = [n_vocab, n_emdb] @ [n_embd]
-    auto p_gemv = llm_bricks::LinuxPerf::Profile("GPT2_final_gemv", "gemv", 0);
-    Tensor logits = ops::gemv(m_w.wte, last);
+    Tensor logits({m_w.config.vocab_size});
+    llm_bricks::GemvParams gemv_params(m_w.wte, last, logits);
+    m_llm_gemv->set_input(gemv_params);
+    {
+        auto p_gemv = llm_bricks::LinuxPerf::Profile("GPT2_final_gemv", "gemv", 0);
+        (void)m_llm_gemv->infer();
+    }
+    // logits.dump("logits_run.txt");
     return std::vector<float>(logits.ptr(), logits.ptr() + logits.numel());
 }
 

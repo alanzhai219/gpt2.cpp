@@ -52,6 +52,7 @@ private:
     size_t m_hidden_dim;
     KVCache m_kv_cache;
     llm_bricks::Context m_llm_context;
+    llm_bricks::Context m_llm_context_ref;
     llm_bricks::Context m_llm_matmul_context{llm_bricks::DeviceType::cpu, llm_bricks::Backend::reference};
     std::unique_ptr<llm_bricks::Add> m_llm_add;
     std::unique_ptr<llm_bricks::LayerNorm> m_llm_layer_norm;
@@ -59,6 +60,7 @@ private:
     std::unique_ptr<llm_bricks::Softmax> m_llm_softmax;
     std::unique_ptr<llm_bricks::Gelu> m_llm_gelu;
     std::unique_ptr<llm_bricks::MatMul> m_llm_matmul;
+    std::unique_ptr<llm_bricks::Gemv> m_llm_gemv;
     float m_scale = 0.0F;
     std::mt19937_64 m_rnd{42};
     bool is_profile = false;
