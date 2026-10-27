@@ -18,6 +18,8 @@ endif()
 
 set(LLMBRICKS_BUILD_TESTS OFF CACHE BOOL "Build llm-bricks tests" FORCE)
 set(LLMBRICKS_INSTALL OFF CACHE BOOL "Install llm-bricks" FORCE)
+set(LLMBRICKS_PARALLEL_BACKEND "omp" CACHE STRING "llm-bricks parallel backend" FORCE)
+
 add_subdirectory(thirdparty/llm-bricks EXCLUDE_FROM_ALL)
 
 add_executable(gpt2

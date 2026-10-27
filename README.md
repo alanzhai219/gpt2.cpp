@@ -51,6 +51,7 @@ turn on the env `export ENABLE_BENCHMARK=1`. Then the `first_token` and `next to
 | v0.0.3 | 223 | 63 | x4.59 | x8.08 | update: element-wise avx2 |
 | v0.0.4 | 115 | 43 | x8.9 | x11.84 | update: matmul avx2 |
 | v0.0.5 | 102 | 24 | x10.0 | x20.2 | update: gemv IPL avx2 |
+| v0.0.6 | 93 | 20 | x11.0 | x25.5 | update: gemv TPL avx2 |
 
 ## profile
 
